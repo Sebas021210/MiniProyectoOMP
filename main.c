@@ -2,20 +2,22 @@
 #include <stdlib.h>
 #include <time.h>
 #include <omp.h>
+#include <string.h>
 
-#define GRID_SIZE 15
+#define GRID_SIZE 20
 #define PLANT 'P'
 #define HERBIVORE 'H'
 #define CARNIVORE 'C'
 #define EMPTY 'X'
 
-#define INITIAL_PLANTS 130
-#define INITIAL_HERBIVORES 40
-#define INITIAL_CARNIVORES 15
+#define INITIAL_PLANTS 250
+#define INITIAL_HERBIVORES 100
+#define INITIAL_CARNIVORES 50
 
 typedef struct {
     char type;
     int energy;
+    int moved;  // Nueva variable para controlar si la celda ya se movió en este tick
 } Cell;
 
 Cell grid[GRID_SIZE][GRID_SIZE];
@@ -26,6 +28,7 @@ void initialize_grid() {
         for (int j = 0; j < GRID_SIZE; j++) {
             grid[i][j].type = EMPTY;
             grid[i][j].energy = 0;
+            grid[i][j].moved = 0;
         }
     }
 
@@ -75,47 +78,113 @@ void print_grid() {
 }
 
 void update_plant(int i, int j) {
-    int reproduce = rand() % 100 < 30; // 30% de probabilidad de reproducción
-    if (reproduce) {
+    if (grid[i][j].moved) return;
+
+    grid[i][j].energy++;
+    int reproduce = rand() % 100 < 10;
+    if (reproduce && grid[i][j].energy > 10) {
         int ni = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         int nj = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         if (grid[ni][nj].type == EMPTY) {
             grid[ni][nj].type = PLANT;
-            grid[ni][nj].energy = 5; // Energía inicial de la nueva planta
+            grid[ni][nj].energy = 5;
+            grid[ni][nj].moved = 1;
+            grid[i][j].energy -= 5;
+        }
+    }
+    grid[i][j].moved = 1;
+}
+
+void update_herbivore(int i, int j) {
+    if (grid[i][j].moved) return;
+
+    grid[i][j].energy--;
+    if (grid[i][j].energy <= 0) {
+        grid[i][j].type = EMPTY;
+        return;
+    }
+
+    int ni = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+    int nj = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+
+    if (grid[ni][nj].type == PLANT && !grid[ni][nj].moved) {
+        grid[i][j].energy += grid[ni][nj].energy;
+        grid[ni][nj].type = HERBIVORE;
+        grid[ni][nj].energy = grid[i][j].energy;
+        grid[ni][nj].moved = 1;
+        grid[i][j].type = EMPTY;
+    } else if (grid[ni][nj].type == EMPTY) {
+        grid[ni][nj].type = HERBIVORE;
+        grid[ni][nj].energy = grid[i][j].energy;
+        grid[ni][nj].moved = 1;
+        grid[i][j].type = EMPTY;
+    } else {
+        grid[i][j].moved = 1;
+    }
+
+    // Reproducción
+    if (grid[i][j].energy > 15) {
+        int reproduce_i = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+        int reproduce_j = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+        if (grid[reproduce_i][reproduce_j].type == EMPTY) {
+            grid[reproduce_i][reproduce_j].type = HERBIVORE;
+            grid[reproduce_i][reproduce_j].energy = 10;
+            grid[reproduce_i][reproduce_j].moved = 1;
+            grid[i][j].energy -= 10;
         }
     }
 }
 
-void update_herbivore(int i, int j) {
-    int ni = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
-    int nj = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
-    if (grid[ni][nj].type == PLANT) {
-        grid[ni][nj].type = HERBIVORE;
-        grid[ni][nj].energy = grid[i][j].energy + grid[ni][nj].energy; // Sumar energía de la planta
-        grid[i][j].type = EMPTY;
-    } else if (grid[ni][nj].type == EMPTY) {
-        grid[ni][nj].type = HERBIVORE;
-        grid[ni][nj].energy = grid[i][j].energy;
-        grid[i][j].type = EMPTY;
-    }
-}
-
 void update_carnivore(int i, int j) {
+    if (grid[i][j].moved) return;
+
+    grid[i][j].energy--;
+    if (grid[i][j].energy <= 0) {
+        grid[i][j].type = EMPTY;
+        return;
+    }
+
     int ni = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
     int nj = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
-    if (grid[ni][nj].type == HERBIVORE) {
+
+    if (grid[ni][nj].type == HERBIVORE && !grid[ni][nj].moved) {
+        grid[i][j].energy += grid[ni][nj].energy;
         grid[ni][nj].type = CARNIVORE;
-        grid[ni][nj].energy = grid[i][j].energy + grid[ni][nj].energy; // Sumar energía del herbívoro
+        grid[ni][nj].energy = grid[i][j].energy;
+        grid[ni][nj].moved = 1;
         grid[i][j].type = EMPTY;
     } else if (grid[ni][nj].type == EMPTY) {
         grid[ni][nj].type = CARNIVORE;
         grid[ni][nj].energy = grid[i][j].energy;
+        grid[ni][nj].moved = 1;
         grid[i][j].type = EMPTY;
+    } else {
+        grid[i][j].moved = 1;
+    }
+
+    // Reproducción
+    if (grid[i][j].energy > 20) {
+        int reproduce_i = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+        int reproduce_j = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
+        if (grid[reproduce_i][reproduce_j].type == EMPTY) {
+            grid[reproduce_i][reproduce_j].type = CARNIVORE;
+            grid[reproduce_i][reproduce_j].energy = 15;
+            grid[reproduce_i][reproduce_j].moved = 1;
+            grid[i][j].energy -= 15;
+        }
     }
 }
 
 void simulate_tick() {
-#pragma omp parallel for
+    // Resetear el estado 'moved' de todas las celdas
+    for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+            grid[i][j].moved = 0;
+        }
+    }
+
+    // Actualizar la cuadrícula
+    #pragma omp parallel for collapse(2)
     for (int i = 0; i < GRID_SIZE; i++) {
         for (int j = 0; j < GRID_SIZE; j++) {
             if (grid[i][j].type == PLANT) {
