@@ -12,7 +12,7 @@
 
 #define INITIAL_PLANTS 250
 #define INITIAL_HERBIVORES 100
-#define INITIAL_CARNIVORES 50
+#define INITIAL_CARNIVORES 30
 
 typedef struct {
     char type;
@@ -81,8 +81,8 @@ void update_plant(int i, int j) {
     if (grid[i][j].moved) return;
 
     grid[i][j].energy++;
-    int reproduce = rand() % 100 < 10;
-    if (reproduce && grid[i][j].energy > 10) {
+    int reproduce = rand() % 100 < 70;
+    if (reproduce && grid[i][j].energy > 17) {
         int ni = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         int nj = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         if (grid[ni][nj].type == EMPTY) {
@@ -123,7 +123,7 @@ void update_herbivore(int i, int j) {
     }
 
     // Reproducción
-    if (grid[i][j].energy > 15) {
+    if (grid[i][j].energy > 1) {
         int reproduce_i = (i + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         int reproduce_j = (j + (rand() % 3) - 1 + GRID_SIZE) % GRID_SIZE;
         if (grid[reproduce_i][reproduce_j].type == EMPTY) {
